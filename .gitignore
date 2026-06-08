@@ -1,0 +1,21 @@
+# Ambiente virtual Python
+venv/
+.venv/
+
+# Arquivos gerados
+atas/
+*.txt
+*.docx
+
+# Áudios (não subir arquivos pesados no GitHub)
+*.mp3
+*.mp4
+*.wav
+*.m4a
+
+# Configurações locais
+.env
+
+# Cache Python
+__pycache__/
+*.pyc
