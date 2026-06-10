@@ -468,19 +468,25 @@ def extrair_participantes(transcricao):
     texto = transcricao[:45000]  # o modelo comporta a transcrição toda; corte de segurança
     prompt = f"""Você analisa a transcrição completa de uma reunião corporativa em português.
 
-Identifique TODAS as pessoas que participaram: quem se apresentou, quem falou sendo identificado e quem foi chamado pelo nome como presente na conversa.
+Liste TODAS as pessoas que participaram da reunião, incluindo:
+- quem falou (mesmo poucas vezes);
+- quem foi cumprimentado, chamado ou tratado diretamente (ex.: "bom dia, Ana", "passa pro João", "o que você acha, Pedro?"), MESMO que tenha falado pouco ou nada;
+- quem foi citado claramente como presente na reunião.
 
-Regras:
+NÃO inclua:
+- pessoas apenas mencionadas que NÃO estavam na reunião (terceiros, clientes ausentes, fornecedores citados);
+- cargos ou nomes de empresas.
+
+Regras de saída:
 - Responda APENAS com os nomes próprios, separados por vírgula, em uma única linha.
 - Use a forma mais completa de cada nome (ex.: se aparecem "Gilberto" e "Gilberto Silva", use "Gilberto Silva"). Nunca repita a mesma pessoa.
-- Não inclua cargos, empresas, nem terceiros apenas mencionados que não estavam na reunião.
 - Se não houver nenhum nome claro, responda exatamente: Não identificado.
 
 Transcrição:
 {texto}"""
 
     resposta = _completar_chat(cliente,
-        model="llama-3.3-70b-versatile",
+        model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
     )
@@ -498,7 +504,7 @@ def mapear_locutores(transcricao_rotulada):
         return transcricao_rotulada, ""
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    amostra = transcricao_rotulada[:45000]
+    amostra = transcricao_rotulada[:30000]
     lista = ", ".join(f"Locutor {l}" for l in labels)
     prompt = f"""Esta é a transcrição de uma reunião com os locutores rotulados ({lista}).
 
@@ -515,7 +521,7 @@ Transcrição:
 {amostra}"""
 
     resposta = _completar_chat(cliente,
-        model="llama-3.3-70b-versatile",
+        model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
     )
