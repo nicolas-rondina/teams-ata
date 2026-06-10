@@ -80,7 +80,7 @@ streamlit run app.py
 
 Faça o upload do áudio, informe o nome da reunião e os participantes, escolha o
 tipo de reunião e clique em **Gerar Ata**. Ao final, a ata aparece na tela e
-pode ser baixada em `.txt`.
+pode ser baixada em **Word (.docx)**, **PDF (.pdf)** ou **texto (.txt)**.
 
 ### Linha de comando
 
@@ -89,7 +89,7 @@ python gerar_ata.py "caminho/do/audio.mp3"
 ```
 
 O script pergunta o nome da reunião, os participantes e o tipo. A ata é salva
-automaticamente na pasta `atas/`.
+automaticamente na pasta `atas/` nos três formatos (`.txt`, `.docx` e `.pdf`).
 
 **Formatos aceitos:** mp3, mp4, wav, ogg, m4a.
 
@@ -133,7 +133,7 @@ Constantes no início de `gerar_ata.py` permitem ajustar o comportamento:
 - [x] Perfis de reunião (planejamento, comercial, técnica, etc.)
 - [x] Interface web para upload do áudio
 - [x] Correção automática de termos na transcrição
-- [ ] Exportar a ata em `.docx` / `.pdf`
+- [x] Exportar a ata em `.docx` / `.pdf`
 - [ ] Integração automática com Microsoft Teams
 
 ## Licença

@@ -4,6 +4,7 @@ import tempfile
 from datetime import datetime
 from dotenv import load_dotenv
 from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, PERFIS
+from exportar import gerar_docx, gerar_pdf
 
 load_dotenv()
 
@@ -79,13 +80,37 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
             st.markdown(conteudo_ia)
 
             st.divider()
-            st.download_button(
-                label="Baixar ata completa (.txt)",
-                data=documento.encode("utf-8"),
-                file_name=f"ata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+            st.markdown("#### Baixar")
+
+            base_nome = f"ata_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            docx_bytes = gerar_docx(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
+            pdf_bytes = gerar_pdf(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
+
+            col_docx, col_pdf, col_txt = st.columns(3)
+            with col_docx:
+                st.download_button(
+                    label="Word (.docx)",
+                    data=docx_bytes,
+                    file_name=f"{base_nome}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
+            with col_pdf:
+                st.download_button(
+                    label="PDF (.pdf)",
+                    data=pdf_bytes,
+                    file_name=f"{base_nome}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            with col_txt:
+                st.download_button(
+                    label="Texto (.txt)",
+                    data=documento.encode("utf-8"),
+                    file_name=f"{base_nome}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
 
         finally:
             os.unlink(caminho_tmp)

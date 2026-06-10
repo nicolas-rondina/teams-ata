@@ -490,15 +490,21 @@ Gerado automaticamente por TeamsAta
     return documento
 
 
-def salvar_ata(documento, nome_reuniao):
+def salvar_ata(documento, conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao="Padrão"):
+    from exportar import gerar_docx, gerar_pdf
+
     os.makedirs("atas", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nome_arquivo = f"atas/ata_{timestamp}.txt"
+    base = f"atas/ata_{timestamp}"
 
-    with open(nome_arquivo, "w", encoding="utf-8") as arquivo:
+    with open(f"{base}.txt", "w", encoding="utf-8") as arquivo:
         arquivo.write(documento)
+    with open(f"{base}.docx", "wb") as arquivo:
+        arquivo.write(gerar_docx(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao))
+    with open(f"{base}.pdf", "wb") as arquivo:
+        arquivo.write(gerar_pdf(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao))
 
-    return nome_arquivo
+    return [f"{base}.txt", f"{base}.docx", f"{base}.pdf"]
 
 
 if __name__ == "__main__":
@@ -528,9 +534,11 @@ if __name__ == "__main__":
     transcricao = corrigir_transcricao(transcricao)
     conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
     documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
-    arquivo_salvo = salvar_ata(documento, nome_reuniao)
+    arquivos_salvos = salvar_ata(documento, conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
 
     print(f"\nAta gerada com sucesso!")
-    print(f"Arquivo salvo em: {arquivo_salvo}")
+    print("Arquivos salvos:")
+    for caminho in arquivos_salvos:
+        print(f"  - {caminho}")
     print("\n--- Preview ---")
     print(documento[:800])
