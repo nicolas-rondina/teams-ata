@@ -229,13 +229,17 @@ PADROES_ALUCINACAO = [
 ]
 
 # Glossário de correção: termos que o Whisper costuma ouvir/escrever errado.
-# A chave é uma expressão regular (sem distinção de maiúsc/minúsc); o valor é a forma correta.
-# Adicione aqui os termos da sua empresa (nomes de pessoas, sistemas internos, siglas, etc.).
+# A chave é uma expressão regular compilada; o valor é a forma correta.
+# A IA já corrige jargão público sozinha (ver corrigir_transcricao); este glossário
+# é uma "trava" opcional para nomes próprios internos que a IA não tem como adivinhar.
 GLOSSARIO_CORRECAO = {
-    r"prote[uú]s": "Protheus",
-    r"\b(?:totos|totus|tots|toto)\b": "TOTVS",
-    r"\b(?:cefaz|cfaz|cfazia)\b": "SEFAZ",
-    r"\bpico\s*fins\b": "PIS/COFINS",
+    re.compile(r"prote[uú]s", re.IGNORECASE): "Protheus",
+    re.compile(r"\b(?:totos|totus|tots|toto)\b", re.IGNORECASE): "TOTVS",
+    re.compile(r"\b(?:cefaz|cfaz|cfazia)\b", re.IGNORECASE): "SEFAZ",
+    re.compile(r"\bpico\s*fins\b", re.IGNORECASE): "PIS/COFINS",
+    # Nome da empresa. Sem IGNORECASE de propósito: só corrige quando vem com
+    # inicial maiúscula (nome próprio), para não mexer na palavra comum "nexo".
+    re.compile(r"\bNex+[ao]\b"): "Nexxa",
 }
 
 
@@ -264,7 +268,7 @@ def _segmento_confiavel(texto, no_speech_prob, avg_logprob):
 def _corrigir_termos(texto):
     """Aplica o glossário de correção de jargão/nomes próprios na transcrição."""
     for padrao, correto in GLOSSARIO_CORRECAO.items():
-        texto = re.sub(padrao, correto, texto, flags=re.IGNORECASE)
+        texto = padrao.sub(correto, texto)
     return texto
 
 
