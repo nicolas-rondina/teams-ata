@@ -45,6 +45,10 @@ if arquivo_audio is not None and st.session_state.get("_arquivo_atual") != arqui
     st.session_state["_arquivo_atual"] = arquivo_audio.name
     st.session_state["nome_reuniao"] = nome_da_gravacao(arquivo_audio.name)
 
+# Preenche o campo Participantes com o que a IA detectou na geração anterior
+if "_part_pendente" in st.session_state:
+    st.session_state["participantes"] = st.session_state.pop("_part_pendente")
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -53,8 +57,9 @@ with col1:
 with col2:
     participantes = st.text_input(
         "Participantes",
+        key="participantes",
         placeholder="Detectado automaticamente se vazio",
-        help="Deixe em branco para a IA identificar os participantes pelos nomes citados na reunião"
+        help="Deixe em branco para a IA identificar os participantes (e preencher aqui) automaticamente"
     )
 
 opcoes_perfil = list(PERFIS.keys())
@@ -120,11 +125,19 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                 "usar_diarizacao": usar_diarizacao,
             }
 
+            # Se a IA detectou os participantes, agenda o preenchimento do campo
+            if participantes_auto and participantes and participantes != "Não identificado":
+                st.session_state["_part_pendente"] = participantes
+
         except Exception as exc:
             st.error(f"❌ {traduzir_erro(exc)}")
 
         finally:
             os.unlink(caminho_tmp)
+
+# Recarrega para preencher o campo Participantes com o que foi detectado
+if "_part_pendente" in st.session_state:
+    st.rerun()
 
 
 # ── Ata gerada: exibição, ajuste interativo e download ──────────────────────
