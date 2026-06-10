@@ -3,7 +3,7 @@ import os
 import tempfile
 from datetime import datetime
 from dotenv import load_dotenv
-from gerar_ata import transcrever_audio, gerar_ata_com_ia, montar_documento, PERFIS
+from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, PERFIS
 
 load_dotenv()
 
@@ -61,6 +61,9 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                 st.write("⏳ Etapa 1/3 — Extraindo e transcrevendo o áudio via Groq...")
                 transcricao = transcrever_audio(caminho_tmp)
                 st.write("✅ Transcrição concluída!")
+                st.write("🔎 Revisando termos técnicos e nomes com IA...")
+                transcricao = corrigir_transcricao(transcricao)
+                st.write("✅ Revisão concluída!")
 
                 st.write(f"⏳ Etapa 2/3 — Gerando ata ({tipo_reuniao}) com IA...")
                 conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)

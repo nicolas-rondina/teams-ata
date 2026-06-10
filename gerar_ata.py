@@ -196,6 +196,12 @@ def dividir_audio(caminho_audio):
 # Troque por "whisper-large-v3-turbo" se quiser priorizar velocidade em vez de precisão.
 MODELO_TRANSCRICAO = "whisper-large-v3"
 
+# Revisão automática da transcrição por IA: corrige termos técnicos, nomes de
+# sistemas e siglas pelo contexto, sem precisar de lista manual.
+# Deixe False para priorizar velocidade em vez de precisão.
+REVISAR_TRANSCRICAO_COM_IA = True
+MODELO_REVISAO = "llama-3.3-70b-versatile"
+
 # Limites para descartar segmentos provavelmente "alucinados" (texto inventado no silêncio).
 # Um segmento só é descartado quando atende AOS DOIS critérios ao mesmo tempo,
 # para evitar apagar fala real. Ajuste se necessário.
@@ -354,6 +360,57 @@ Seja fiel ao que foi dito. Não adicione informações que não estão no trecho
     return resposta.choices[0].message.content
 
 
+def corrigir_transcricao(transcricao):
+    """Revisa a transcrição com o LLM, corrigindo automaticamente erros de
+    grafia em termos técnicos, nomes de sistemas e siglas — usando o contexto,
+    sem alterar o conteúdo das falas nem os marcadores de tempo."""
+    import time
+
+    if not REVISAR_TRANSCRICAO_COM_IA or not transcricao.strip():
+        return transcricao
+
+    cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    chunks = dividir_transcricao(transcricao)
+    total = len(chunks)
+    print(f"Revisando termos da transcrição ({total} parte{'s' if total > 1 else ''})...")
+
+    partes = []
+    for i, chunk in enumerate(chunks):
+        if total > 1:
+            print(f"  Revisando parte {i+1}/{total}...")
+        prompt = f"""Você revisa transcrições automáticas de reuniões corporativas em português brasileiro.
+
+A transcrição abaixo contém erros de grafia em termos técnicos, nomes de sistemas/empresas e siglas (contexto de ERP, área fiscal e contábil). Corrija SOMENTE esses erros óbvios, usando o contexto da conversa.
+
+REGRAS RÍGIDAS — siga à risca:
+- NÃO altere o sentido das frases nem o estilo de fala.
+- NÃO adicione, resuma ou remova nenhuma fala.
+- MANTENHA todos os marcadores de tempo [mm:ss] exatamente onde estão.
+- Corrija apenas grafias claramente erradas de termos reconhecíveis pelo contexto (softwares, impostos, sistemas, siglas). Na dúvida, mantenha o original.
+- Responda APENAS com a transcrição corrigida, no mesmo formato, sem comentários.
+
+Transcrição:
+{chunk}"""
+
+        resposta = cliente.chat.completions.create(
+            model=MODELO_REVISAO,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        corrigido = resposta.choices[0].message.content.strip()
+
+        # Salvaguarda: se o modelo encurtou demais, provavelmente resumiu por
+        # engano — nesse caso mantemos o trecho original.
+        if len(corrigido) < len(chunk) * 0.6:
+            corrigido = chunk
+
+        partes.append(corrigido)
+        if total > 1 and i < total - 1:
+            time.sleep(12)
+
+    return "\n".join(partes)
+
+
 def gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao="Padrão"):
     import time
     print(f"Gerando ata ({tipo_reuniao})...")
@@ -464,6 +521,7 @@ if __name__ == "__main__":
     tipo_reuniao = input("Tipo de reunião (Enter para Padrão): ").strip() or "Padrão"
 
     transcricao = transcrever_audio(caminho_audio)
+    transcricao = corrigir_transcricao(transcricao)
     conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
     documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
     arquivo_salvo = salvar_ata(documento, nome_reuniao)
