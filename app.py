@@ -6,7 +6,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from gerar_ata import (
     transcrever_audio, corrigir_transcricao, extrair_participantes,
-    mapear_locutores, gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS,
+    mapear_locutores, gerar_ata_com_ia, refinar_ata, montar_documento,
+    traduzir_erro, PERFIS,
 )
 from exportar import gerar_docx, gerar_pdf
 from tema import aplicar_tema, rodape
@@ -85,7 +86,7 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
         try:
             with st.status("Processando reunião...", expanded=True) as status:
                 if usar_diarizacao:
-                    st.write("⏳ Etapa 1/3 — Transcrevendo e separando os locutores (AssemblyAI)...")
+                    st.write("⏳ Etapa 1/2 — Transcrevendo e separando os locutores (AssemblyAI)...")
                     transcricao = diarizacao.transcrever_diarizado(caminho_tmp)
                     st.write("✅ Transcrição com locutores concluída!")
                     st.write("🧩 Identificando os participantes pelas vozes...")
@@ -94,7 +95,7 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                         participantes = detectados or "Não identificado"
                     st.write(f"✅ Participantes: {detectados or 'Não identificado'}")
                 else:
-                    st.write("⏳ Etapa 1/3 — Extraindo e transcrevendo o áudio via Groq...")
+                    st.write("⏳ Etapa 1/2 — Extraindo e transcrevendo o áudio via Groq...")
                     transcricao = transcrever_audio(caminho_tmp)
                     st.write("✅ Transcrição concluída!")
                     st.write("🔎 Revisando termos técnicos e nomes com IA...")
@@ -105,70 +106,89 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                         participantes = extrair_participantes(transcricao) or "Não identificado"
                         st.write(f"✅ Participantes: {participantes}")
 
-                st.write(f"⏳ Etapa 2/3 — Gerando ata ({tipo_reuniao}) com IA...")
+                st.write(f"⏳ Etapa 2/2 — Gerando ata ({tipo_reuniao}) com IA...")
                 conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
-                st.write("✅ Ata gerada!")
-
-                st.write("⏳ Etapa 3/3 — Montando documento final...")
-                documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
                 status.update(label="✅ Ata gerada com sucesso!", state="complete")
 
-            st.success("Pronto! Sua ata está abaixo.")
-
-            if participantes_auto and usar_diarizacao:
-                st.info(
-                    f"👥 **Participantes identificados (separação de voz):** {participantes}\n\n"
-                    "A IA separou as vozes e deduziu os nomes pelo diálogo. Se algum aparecer como "
-                    "'Locutor X', o nome dele não foi dito na reunião. Ajuste o campo **Participantes** "
-                    "e gere novamente se precisar."
-                )
-            elif participantes_auto:
-                st.info(
-                    f"👥 **Participantes identificados automaticamente:** {participantes}\n\n"
-                    "A lista vem dos nomes citados na reunião, então pode não incluir quem ficou "
-                    "calado. Se faltar alguém, preencha o campo **Participantes** e gere novamente."
-                )
-
-            st.markdown("### Ata gerada")
-            st.markdown(conteudo_ia)
-
-            st.divider()
-            st.markdown("#### Baixar")
-
-            base_nome = f"ata_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            docx_bytes = gerar_docx(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
-            pdf_bytes = gerar_pdf(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
-
-            col_docx, col_pdf, col_txt = st.columns(3)
-            with col_docx:
-                st.download_button(
-                    label="Word (.docx)",
-                    data=docx_bytes,
-                    file_name=f"{base_nome}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
-                )
-            with col_pdf:
-                st.download_button(
-                    label="PDF (.pdf)",
-                    data=pdf_bytes,
-                    file_name=f"{base_nome}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-            with col_txt:
-                st.download_button(
-                    label="Texto (.txt)",
-                    data=documento.encode("utf-8"),
-                    file_name=f"{base_nome}.txt",
-                    mime="text/plain",
-                    use_container_width=True
-                )
+            st.session_state["ata"] = {
+                "conteudo": conteudo_ia,
+                "transcricao": transcricao,
+                "nome": nome_reuniao,
+                "participantes": participantes,
+                "tipo": tipo_reuniao,
+                "participantes_auto": participantes_auto,
+                "usar_diarizacao": usar_diarizacao,
+            }
 
         except Exception as exc:
             st.error(f"❌ {traduzir_erro(exc)}")
 
         finally:
             os.unlink(caminho_tmp)
+
+
+# ── Ata gerada: exibição, ajuste interativo e download ──────────────────────
+if "ata" in st.session_state:
+    ata = st.session_state["ata"]
+
+    if ata["participantes_auto"] and ata["usar_diarizacao"]:
+        st.info(
+            f"👥 **Participantes identificados (separação de voz):** {ata['participantes']}\n\n"
+            "A IA separou as vozes e deduziu os nomes pelo diálogo. Se algum aparecer como "
+            "'Locutor X', o nome dele não foi dito na reunião."
+        )
+    elif ata["participantes_auto"]:
+        st.info(
+            f"👥 **Participantes identificados automaticamente:** {ata['participantes']}\n\n"
+            "A lista vem dos nomes citados na reunião, então pode não incluir quem ficou calado."
+        )
+
+    st.markdown("### Ata gerada")
+    st.markdown(ata["conteudo"])
+
+    # Ajuste interativo: o usuário pede correções em linguagem natural
+    with st.expander("✏️ Não ficou bom? Peça um ajuste para a IA", expanded=False):
+        instrucao = st.text_area(
+            "O que você quer corrigir ou melhorar na ata?",
+            placeholder="Ex.: detalhe melhor as decisões; remova a seção Riscos; "
+                        "corrija 'Joao' para 'João'; deixe o tom mais formal",
+            key="instrucao_ajuste",
+        )
+        if st.button("Corrigir ata", use_container_width=True):
+            if instrucao.strip():
+                try:
+                    with st.spinner("Aplicando o ajuste..."):
+                        st.session_state["ata"]["conteudo"] = refinar_ata(ata["conteudo"], instrucao)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"❌ {traduzir_erro(exc)}")
+            else:
+                st.warning("Escreva o que você quer ajustar.")
+
+    # Download — sempre reflete a versão mais recente da ata
+    st.divider()
+    st.markdown("#### Baixar")
+    documento = montar_documento(ata["conteudo"], ata["nome"], ata["participantes"], ata["transcricao"], ata["tipo"])
+    base_nome = f"ata_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    docx_bytes = gerar_docx(ata["conteudo"], ata["nome"], ata["participantes"], ata["transcricao"], ata["tipo"])
+    pdf_bytes = gerar_pdf(ata["conteudo"], ata["nome"], ata["participantes"], ata["transcricao"], ata["tipo"])
+
+    col_docx, col_pdf, col_txt = st.columns(3)
+    with col_docx:
+        st.download_button(
+            label="Word (.docx)", data=docx_bytes, file_name=f"{base_nome}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+        )
+    with col_pdf:
+        st.download_button(
+            label="PDF (.pdf)", data=pdf_bytes, file_name=f"{base_nome}.pdf",
+            mime="application/pdf", use_container_width=True,
+        )
+    with col_txt:
+        st.download_button(
+            label="Texto (.txt)", data=documento.encode("utf-8"), file_name=f"{base_nome}.txt",
+            mime="text/plain", use_container_width=True,
+        )
 
 rodape()

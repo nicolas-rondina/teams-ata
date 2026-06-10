@@ -585,6 +585,30 @@ Gere a ata no seguinte formato:{perfil["instrucoes"]}
     return resposta.choices[0].message.content
 
 
+def refinar_ata(conteudo_ata, instrucao):
+    """Aplica um ajuste pedido pelo usuário na ata já gerada, preservando o resto."""
+    cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    prompt = f"""Você é um editor de atas de reunião. Abaixo está uma ata já gerada e um pedido de ajuste do usuário.
+
+Aplique SOMENTE o ajuste pedido, mantendo todo o restante da ata intacto e no mesmo formato (Markdown, mesmas seções e estilo).
+Não invente fatos que não estavam na ata, a menos que o pedido seja explicitamente uma reformulação de texto.
+Responda APENAS com a ata completa já corrigida, sem comentários antes ou depois.
+
+ATA ATUAL:
+{conteudo_ata}
+
+AJUSTE PEDIDO:
+{instrucao}"""
+
+    resposta = _completar_chat(
+        cliente,
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+    )
+    return resposta.choices[0].message.content
+
+
 def montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao="Padrão"):
     agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
 
