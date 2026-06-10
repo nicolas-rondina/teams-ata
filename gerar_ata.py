@@ -191,7 +191,47 @@ def dividir_audio(caminho_audio):
     return chunks, True
 
 
-def transcrever_audio(caminho_audio):
+# Modelo de transcrição. "whisper-large-v3" é o mais preciso e o que menos alucina.
+# Troque por "whisper-large-v3-turbo" se quiser priorizar velocidade em vez de precisão.
+MODELO_TRANSCRICAO = "whisper-large-v3"
+
+# Limites para descartar segmentos provavelmente "alucinados" (texto inventado no silêncio).
+# Um segmento só é descartado quando atende AOS DOIS critérios ao mesmo tempo,
+# para evitar apagar fala real. Ajuste se necessário.
+LIMITE_NO_SPEECH = 0.6   # acima disso: provável trecho sem fala
+LIMITE_LOGPROB = -0.5    # abaixo disso: baixa confiança na transcrição
+
+# Frases que o Whisper costuma inventar em trechos de silêncio/ruído (estilo legenda de vídeo).
+FRASES_ALUCINACAO = {
+    "legendas pela comunidade amara.org",
+    "amara.org",
+    "obrigado por assistir",
+    "obrigado por assistir!",
+    "inscreva-se no canal",
+    "até o próximo vídeo",
+    "muito obrigado.",
+}
+
+
+def _campo_segmento(segmento, nome, padrao=0.0):
+    """Lê um campo do segmento, funcionando tanto para dict quanto para objeto."""
+    valor = segmento[nome] if isinstance(segmento, dict) else getattr(segmento, nome, padrao)
+    return padrao if valor is None else valor
+
+
+def _segmento_confiavel(texto, no_speech_prob, avg_logprob):
+    """Decide se um segmento é fala real ou provável alucinação."""
+    limpo = texto.strip().lower()
+    if not limpo:
+        return False
+    if limpo in FRASES_ALUCINACAO:
+        return False
+    if no_speech_prob > LIMITE_NO_SPEECH and avg_logprob < LIMITE_LOGPROB:
+        return False
+    return True
+
+
+def transcrever_audio(caminho_audio, contexto=""):
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     caminho_mp3 = extrair_audio_mp3(caminho_audio)
@@ -205,16 +245,23 @@ def transcrever_audio(caminho_audio):
         with open(chunk, "rb") as f:
             resposta = cliente.audio.transcriptions.create(
                 file=(os.path.basename(chunk), f.read()),
-                model="whisper-large-v3-turbo",
+                model=MODELO_TRANSCRICAO,
                 language="pt",
+                prompt=contexto,
+                temperature=0.0,
                 response_format="verbose_json",
                 timestamp_granularities=["segment"]
             )
 
         for segmento in resposta.segments:
-            inicio_seg = segmento["start"] if isinstance(segmento, dict) else segmento.start
             texto_seg = segmento["text"] if isinstance(segmento, dict) else segmento.text
-            tempo_real = inicio_seg + offset
+            no_speech_prob = _campo_segmento(segmento, "no_speech_prob")
+            avg_logprob = _campo_segmento(segmento, "avg_logprob")
+
+            if not _segmento_confiavel(texto_seg, no_speech_prob, avg_logprob):
+                continue
+
+            tempo_real = _campo_segmento(segmento, "start") + offset
             minutos = int(tempo_real // 60)
             segundos = int(tempo_real % 60)
             linhas.append(f"[{minutos:02d}:{segundos:02d}] {texto_seg.strip()}")
@@ -383,7 +430,8 @@ if __name__ == "__main__":
     print("Tipos disponíveis:", ", ".join(PERFIS.keys()))
     tipo_reuniao = input("Tipo de reunião (Enter para Padrão): ").strip() or "Padrão"
 
-    transcricao = transcrever_audio(caminho_audio)
+    contexto = f"Reunião: {nome_reuniao}. Participantes: {participantes}."
+    transcricao = transcrever_audio(caminho_audio, contexto=contexto)
     conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
     documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
     arquivo_salvo = salvar_ata(documento, nome_reuniao)
