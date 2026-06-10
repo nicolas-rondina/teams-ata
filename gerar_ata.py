@@ -37,6 +37,20 @@ def traduzir_erro(exc):
         return f"Erro na API da Groq: {exc}"
     return f"Ocorreu um erro inesperado: {exc}"
 
+
+def _completar_chat(cliente, **kwargs):
+    """Chama o chat da Groq, repetindo com espera se o limite de uso for atingido."""
+    import time
+    for tentativa in range(3):
+        try:
+            return cliente.chat.completions.create(**kwargs)
+        except groq.RateLimitError:
+            if tentativa == 2:
+                raise
+            espera = 20 * (tentativa + 1)
+            print(f"Limite da Groq atingido — aguardando {espera}s e tentando novamente...")
+            time.sleep(espera)
+
 PERFIS = {
     "Padrão": {
         "descricao": "Ata geral para qualquer tipo de reunião",
@@ -381,7 +395,7 @@ Extraia em tópicos:
 
 Seja fiel ao que foi dito. Não adicione informações que não estão no trecho."""
 
-    resposta = cliente.chat.completions.create(
+    resposta = _completar_chat(cliente,
         model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
@@ -422,7 +436,7 @@ REGRAS RÍGIDAS — siga à risca:
 Transcrição:
 {chunk}"""
 
-        resposta = cliente.chat.completions.create(
+        resposta = _completar_chat(cliente,
             model=MODELO_REVISAO,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
@@ -451,7 +465,7 @@ def extrair_participantes(transcricao):
         return ""
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    texto = transcricao[:120000]  # o modelo comporta a transcrição toda; corte de segurança
+    texto = transcricao[:45000]  # o modelo comporta a transcrição toda; corte de segurança
     prompt = f"""Você analisa a transcrição completa de uma reunião corporativa em português.
 
 Identifique TODAS as pessoas que participaram: quem se apresentou, quem falou sendo identificado e quem foi chamado pelo nome como presente na conversa.
@@ -465,7 +479,7 @@ Regras:
 Transcrição:
 {texto}"""
 
-    resposta = cliente.chat.completions.create(
+    resposta = _completar_chat(cliente,
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
@@ -484,7 +498,7 @@ def mapear_locutores(transcricao_rotulada):
         return transcricao_rotulada, ""
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    amostra = transcricao_rotulada[:120000]
+    amostra = transcricao_rotulada[:45000]
     lista = ", ".join(f"Locutor {l}" for l in labels)
     prompt = f"""Esta é a transcrição de uma reunião com os locutores rotulados ({lista}).
 
@@ -500,7 +514,7 @@ Regras:
 Transcrição:
 {amostra}"""
 
-    resposta = cliente.chat.completions.create(
+    resposta = _completar_chat(cliente,
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
@@ -562,7 +576,7 @@ REGRAS IMPORTANTES — siga à risca:
 Gere a ata no seguinte formato:{perfil["instrucoes"]}
 """
 
-    resposta = cliente.chat.completions.create(
+    resposta = _completar_chat(cliente,
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
