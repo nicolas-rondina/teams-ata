@@ -134,6 +134,7 @@ Constantes no início de `gerar_ata.py` permitem ajustar o comportamento:
 - [x] Interface web para upload do áudio
 - [x] Correção automática de termos na transcrição
 - [x] Exportar a ata em `.docx` / `.pdf`
+- [x] Mensagens de erro amigáveis
 - [ ] Integração automática com Microsoft Teams
 
 ## Licença
