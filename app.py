@@ -1,11 +1,24 @@
 import streamlit as st
 import os
+import re
 import tempfile
 from datetime import datetime
 from dotenv import load_dotenv
-from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS
+from gerar_ata import (
+    transcrever_audio, corrigir_transcricao, extrair_participantes,
+    gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS,
+)
 from exportar import gerar_docx, gerar_pdf
 from tema import aplicar_tema, rodape
+
+
+def nome_da_gravacao(nome_arquivo):
+    """Deriva o nome da reunião a partir do nome do arquivo da gravação do Teams."""
+    base = os.path.splitext(nome_arquivo)[0]
+    base = re.sub(r"[-_ ]*\d{8}[_ ]?\d{6}.*$", "", base)  # carimbo de data 20260610_140000
+    base = re.sub(r"[-_ ]*(meeting recording|grava[çc][ãa]o|recording|v[íi]deo)\b.*$", "", base, flags=re.IGNORECASE)
+    base = base.replace("_", " ").strip(" -")
+    return base or os.path.splitext(nome_arquivo)[0]
 
 load_dotenv()
 
@@ -20,18 +33,27 @@ st.caption("Gerador automático de atas de reunião com IA")
 st.divider()
 
 arquivo_audio = st.file_uploader(
-    "Selecione o áudio da reunião",
+    "Selecione a gravação da reunião",
     type=["mp3", "mp4", "wav", "ogg", "m4a"],
-    help="Formatos aceitos: mp3, mp4, wav, ogg, m4a"
+    help="Baixe a gravação do Teams (OneDrive › Gravações) e anexe aqui. Formatos: mp3, mp4, wav, ogg, m4a"
 )
+
+# Auto-preenche o nome da reunião a partir do nome do arquivo da gravação
+if arquivo_audio is not None and st.session_state.get("_arquivo_atual") != arquivo_audio.name:
+    st.session_state["_arquivo_atual"] = arquivo_audio.name
+    st.session_state["nome_reuniao"] = nome_da_gravacao(arquivo_audio.name)
 
 col1, col2 = st.columns(2)
 
 with col1:
-    nome_reuniao = st.text_input("Nome da reunião", placeholder="Ex: Planejamento Q3")
+    nome_reuniao = st.text_input("Nome da reunião", key="nome_reuniao", placeholder="Preenchido pela gravação")
 
 with col2:
-    participantes = st.text_input("Participantes", placeholder="Ex: João, Ana, Pedro")
+    participantes = st.text_input(
+        "Participantes",
+        placeholder="Detectado automaticamente se vazio",
+        help="Deixe em branco para a IA identificar os participantes pelos nomes citados na reunião"
+    )
 
 opcoes_perfil = list(PERFIS.keys())
 tipo_reuniao = st.selectbox(
@@ -49,8 +71,6 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
         st.error("Selecione um arquivo de áudio.")
     elif not nome_reuniao:
         st.error("Digite o nome da reunião.")
-    elif not participantes:
-        st.error("Digite os participantes.")
     elif not os.getenv("GROQ_API_KEY"):
         st.error("GROQ_API_KEY não encontrada. Verifique o arquivo .env")
     else:
@@ -66,6 +86,11 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                 st.write("🔎 Revisando termos técnicos e nomes com IA...")
                 transcricao = corrigir_transcricao(transcricao)
                 st.write("✅ Revisão concluída!")
+
+                if not participantes.strip():
+                    st.write("🧩 Identificando os participantes...")
+                    participantes = extrair_participantes(transcricao) or "Não identificado"
+                    st.write(f"✅ Participantes: {participantes}")
 
                 st.write(f"⏳ Etapa 2/3 — Gerando ata ({tipo_reuniao}) com IA...")
                 conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)

@@ -440,6 +440,34 @@ Transcrição:
     return "\n".join(partes)
 
 
+def extrair_participantes(transcricao):
+    """Usa o LLM para identificar os nomes dos participantes citados na transcrição."""
+    if not transcricao.strip():
+        return ""
+
+    cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    amostra = transcricao[:6000]  # nomes costumam aparecer no início/apresentações
+    prompt = f"""Analise esta transcrição de reunião e liste os nomes próprios das pessoas que participaram (que falaram ou foram tratadas diretamente).
+
+Regras:
+- Responda APENAS com os nomes, separados por vírgula, em uma única linha.
+- Não inclua cargos, empresas nem pessoas apenas mencionadas de passagem.
+- Se não houver nomes claros, responda exatamente: Não identificado.
+
+Transcrição:
+{amostra}"""
+
+    resposta = cliente.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+    nomes = resposta.choices[0].message.content.strip()
+    if "não identificado" in nomes.lower():
+        return ""
+    return nomes
+
+
 def gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao="Padrão"):
     import time
     print(f"Gerando ata ({tipo_reuniao})...")
