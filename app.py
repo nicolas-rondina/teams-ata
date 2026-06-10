@@ -5,17 +5,18 @@ from datetime import datetime
 from dotenv import load_dotenv
 from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS
 from exportar import gerar_docx, gerar_pdf
+from tema import aplicar_tema
 
 load_dotenv()
 
 st.set_page_config(
-    page_title="TeamsAta",
+    page_title="TeamsAta · Nexxa",
     page_icon="📋",
     layout="centered"
 )
 
-st.title("📋 TeamsAta")
-st.subheader("Gerador automático de atas de reunião com IA")
+aplicar_tema()
+st.caption("Gerador automático de atas de reunião com IA")
 st.divider()
 
 arquivo_audio = st.file_uploader(
