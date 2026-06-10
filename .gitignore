@@ -8,6 +8,9 @@ atas/
 *.docx
 *.pdf
 
+# Exceção: o requirements.txt precisa ser versionado (apesar da regra *.txt)
+!requirements.txt
+
 # Áudios (não subir arquivos pesados no GitHub)
 *.mp3
 *.mp4
