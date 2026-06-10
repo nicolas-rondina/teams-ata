@@ -59,8 +59,7 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
         try:
             with st.status("Processando reunião...", expanded=True) as status:
                 st.write("⏳ Etapa 1/3 — Extraindo e transcrevendo o áudio via Groq...")
-                contexto = f"Reunião: {nome_reuniao}. Participantes: {participantes}."
-                transcricao = transcrever_audio(caminho_tmp, contexto=contexto)
+                transcricao = transcrever_audio(caminho_tmp)
                 st.write("✅ Transcrição concluída!")
 
                 st.write(f"⏳ Etapa 2/3 — Gerando ata ({tipo_reuniao}) com IA...")

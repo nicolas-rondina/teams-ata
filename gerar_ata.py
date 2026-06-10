@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import subprocess
 import tempfile
 from datetime import datetime
@@ -198,8 +199,9 @@ MODELO_TRANSCRICAO = "whisper-large-v3"
 # Limites para descartar segmentos provavelmente "alucinados" (texto inventado no silêncio).
 # Um segmento só é descartado quando atende AOS DOIS critérios ao mesmo tempo,
 # para evitar apagar fala real. Ajuste se necessário.
-LIMITE_NO_SPEECH = 0.6   # acima disso: provável trecho sem fala
-LIMITE_LOGPROB = -0.5    # abaixo disso: baixa confiança na transcrição
+LIMITE_NO_SPEECH = 0.6        # acima disso: provável trecho sem fala
+LIMITE_LOGPROB = -0.5         # abaixo disso: baixa confiança na transcrição
+LIMITE_NO_SPEECH_FORTE = 0.8  # acima disso: descarta mesmo com boa confiança (silêncio quase certo)
 
 # Frases que o Whisper costuma inventar em trechos de silêncio/ruído (estilo legenda de vídeo).
 FRASES_ALUCINACAO = {
@@ -211,6 +213,14 @@ FRASES_ALUCINACAO = {
     "até o próximo vídeo",
     "muito obrigado.",
 }
+
+# Padrões (início da frase) típicos de alucinação de legenda/silêncio.
+PADROES_ALUCINACAO = [
+    re.compile(r"^\s*legendas?\s+(por|pela)\b", re.IGNORECASE),
+    re.compile(r"amara\.org", re.IGNORECASE),
+    re.compile(r"^\s*inscreva-se\b", re.IGNORECASE),
+    re.compile(r"^\s*obrigado por assistir", re.IGNORECASE),
+]
 
 
 def _campo_segmento(segmento, nome, padrao=0.0):
@@ -226,12 +236,16 @@ def _segmento_confiavel(texto, no_speech_prob, avg_logprob):
         return False
     if limpo in FRASES_ALUCINACAO:
         return False
+    if any(padrao.search(texto) for padrao in PADROES_ALUCINACAO):
+        return False
+    if no_speech_prob > LIMITE_NO_SPEECH_FORTE:
+        return False
     if no_speech_prob > LIMITE_NO_SPEECH and avg_logprob < LIMITE_LOGPROB:
         return False
     return True
 
 
-def transcrever_audio(caminho_audio, contexto=""):
+def transcrever_audio(caminho_audio):
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     caminho_mp3 = extrair_audio_mp3(caminho_audio)
@@ -243,11 +257,12 @@ def transcrever_audio(caminho_audio, contexto=""):
     for i, (chunk, offset) in enumerate(chunks):
         print(f"Transcrevendo parte {i+1}/{total}...")
         with open(chunk, "rb") as f:
+            # NÃO passamos 'prompt' aqui de propósito: o Whisper repete o texto
+            # do prompt nos trechos de silêncio, criando alucinações.
             resposta = cliente.audio.transcriptions.create(
                 file=(os.path.basename(chunk), f.read()),
                 model=MODELO_TRANSCRICAO,
                 language="pt",
-                prompt=contexto,
                 temperature=0.0,
                 response_format="verbose_json",
                 timestamp_granularities=["segment"]
@@ -430,8 +445,7 @@ if __name__ == "__main__":
     print("Tipos disponíveis:", ", ".join(PERFIS.keys()))
     tipo_reuniao = input("Tipo de reunião (Enter para Padrão): ").strip() or "Padrão"
 
-    contexto = f"Reunião: {nome_reuniao}. Participantes: {participantes}."
-    transcricao = transcrever_audio(caminho_audio, contexto=contexto)
+    transcricao = transcrever_audio(caminho_audio)
     conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
     documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
     arquivo_salvo = salvar_ata(documento, nome_reuniao)
