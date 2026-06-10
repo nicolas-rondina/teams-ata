@@ -222,6 +222,16 @@ PADROES_ALUCINACAO = [
     re.compile(r"^\s*obrigado por assistir", re.IGNORECASE),
 ]
 
+# Glossário de correção: termos que o Whisper costuma ouvir/escrever errado.
+# A chave é uma expressão regular (sem distinção de maiúsc/minúsc); o valor é a forma correta.
+# Adicione aqui os termos da sua empresa (nomes de pessoas, sistemas internos, siglas, etc.).
+GLOSSARIO_CORRECAO = {
+    r"prote[uú]s": "Protheus",
+    r"\b(?:totos|totus|tots|toto)\b": "TOTVS",
+    r"\b(?:cefaz|cfaz|cfazia)\b": "SEFAZ",
+    r"\bpico\s*fins\b": "PIS/COFINS",
+}
+
 
 def _campo_segmento(segmento, nome, padrao=0.0):
     """Lê um campo do segmento, funcionando tanto para dict quanto para objeto."""
@@ -243,6 +253,13 @@ def _segmento_confiavel(texto, no_speech_prob, avg_logprob):
     if no_speech_prob > LIMITE_NO_SPEECH and avg_logprob < LIMITE_LOGPROB:
         return False
     return True
+
+
+def _corrigir_termos(texto):
+    """Aplica o glossário de correção de jargão/nomes próprios na transcrição."""
+    for padrao, correto in GLOSSARIO_CORRECAO.items():
+        texto = re.sub(padrao, correto, texto, flags=re.IGNORECASE)
+    return texto
 
 
 def transcrever_audio(caminho_audio):
@@ -279,7 +296,8 @@ def transcrever_audio(caminho_audio):
             tempo_real = _campo_segmento(segmento, "start") + offset
             minutos = int(tempo_real // 60)
             segundos = int(tempo_real % 60)
-            linhas.append(f"[{minutos:02d}:{segundos:02d}] {texto_seg.strip()}")
+            texto_corrigido = _corrigir_termos(texto_seg.strip())
+            linhas.append(f"[{minutos:02d}:{segundos:02d}] {texto_corrigido}")
 
         if foi_dividido:
             os.unlink(chunk)
