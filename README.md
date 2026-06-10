@@ -43,6 +43,7 @@ A ata é estruturada de acordo com o perfil escolhido:
 
 - **Python 3.8+**
 - **Groq API** — transcrição (Whisper) e geração da ata (Llama)
+- **AssemblyAI** *(opcional)* — diarização (separação de locutores) para identificar participantes
 - **FFmpeg** — extração e processamento de áudio/vídeo
 - **Streamlit** — interface web
 
@@ -69,6 +70,20 @@ cp .env.example .env
 ```env
 GROQ_API_KEY=sua_chave_aqui
 ```
+
+### Identificação de participantes (opcional)
+
+Por padrão, os participantes são identificados pelos **nomes citados** na reunião
+(aproximado). Para identificar **por separação de voz** (diarização), configure
+uma chave gratuita da [AssemblyAI](https://www.assemblyai.com/):
+
+```env
+ASSEMBLYAI_API_KEY=sua_chave_aqui
+```
+
+Com ela, a transcrição passa a separar os locutores e a IA mapeia cada voz a um
+nome — a transcrição fica com autoria ("Gilberto: ...") e a lista de participantes
+mais confiável. Deixe em branco para usar apenas o Groq.
 
 ## Como usar
 

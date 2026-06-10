@@ -6,10 +6,11 @@ from datetime import datetime
 from dotenv import load_dotenv
 from gerar_ata import (
     transcrever_audio, corrigir_transcricao, extrair_participantes,
-    gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS,
+    mapear_locutores, gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS,
 )
 from exportar import gerar_docx, gerar_pdf
 from tema import aplicar_tema, rodape
+import diarizacao
 
 
 def nome_da_gravacao(nome_arquivo):
@@ -79,20 +80,30 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
             caminho_tmp = tmp.name
 
         participantes_auto = not participantes.strip()
+        usar_diarizacao = diarizacao.disponivel()
 
         try:
             with st.status("Processando reunião...", expanded=True) as status:
-                st.write("⏳ Etapa 1/3 — Extraindo e transcrevendo o áudio via Groq...")
-                transcricao = transcrever_audio(caminho_tmp)
-                st.write("✅ Transcrição concluída!")
-                st.write("🔎 Revisando termos técnicos e nomes com IA...")
-                transcricao = corrigir_transcricao(transcricao)
-                st.write("✅ Revisão concluída!")
-
-                if participantes_auto:
-                    st.write("🧩 Identificando os participantes pelos nomes citados...")
-                    participantes = extrair_participantes(transcricao) or "Não identificado"
-                    st.write(f"✅ Participantes: {participantes}")
+                if usar_diarizacao:
+                    st.write("⏳ Etapa 1/3 — Transcrevendo e separando os locutores (AssemblyAI)...")
+                    transcricao = diarizacao.transcrever_diarizado(caminho_tmp)
+                    st.write("✅ Transcrição com locutores concluída!")
+                    st.write("🧩 Identificando os participantes pelas vozes...")
+                    transcricao, detectados = mapear_locutores(transcricao)
+                    if participantes_auto:
+                        participantes = detectados or "Não identificado"
+                    st.write(f"✅ Participantes: {detectados or 'Não identificado'}")
+                else:
+                    st.write("⏳ Etapa 1/3 — Extraindo e transcrevendo o áudio via Groq...")
+                    transcricao = transcrever_audio(caminho_tmp)
+                    st.write("✅ Transcrição concluída!")
+                    st.write("🔎 Revisando termos técnicos e nomes com IA...")
+                    transcricao = corrigir_transcricao(transcricao)
+                    st.write("✅ Revisão concluída!")
+                    if participantes_auto:
+                        st.write("🧩 Identificando os participantes pelos nomes citados...")
+                        participantes = extrair_participantes(transcricao) or "Não identificado"
+                        st.write(f"✅ Participantes: {participantes}")
 
                 st.write(f"⏳ Etapa 2/3 — Gerando ata ({tipo_reuniao}) com IA...")
                 conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
@@ -104,7 +115,14 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
 
             st.success("Pronto! Sua ata está abaixo.")
 
-            if participantes_auto:
+            if participantes_auto and usar_diarizacao:
+                st.info(
+                    f"👥 **Participantes identificados (separação de voz):** {participantes}\n\n"
+                    "A IA separou as vozes e deduziu os nomes pelo diálogo. Se algum aparecer como "
+                    "'Locutor X', o nome dele não foi dito na reunião. Ajuste o campo **Participantes** "
+                    "e gere novamente se precisar."
+                )
+            elif participantes_auto:
                 st.info(
                     f"👥 **Participantes identificados automaticamente:** {participantes}\n\n"
                     "A lista vem dos nomes citados na reunião, então pode não incluir quem ficou "

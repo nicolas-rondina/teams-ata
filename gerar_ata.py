@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import json
 import subprocess
 import tempfile
 from datetime import datetime
@@ -475,6 +476,53 @@ Transcrição:
     return nomes
 
 
+def mapear_locutores(transcricao_rotulada):
+    """Mapeia os rótulos de locutor ('Locutor A', 'B'...) aos nomes reais
+    identificados no diálogo. Retorna (transcricao_com_nomes, participantes)."""
+    labels = sorted(set(re.findall(r"Locutor ([A-Z])\b", transcricao_rotulada)))
+    if not labels:
+        return transcricao_rotulada, ""
+
+    cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    amostra = transcricao_rotulada[:120000]
+    lista = ", ".join(f"Locutor {l}" for l in labels)
+    prompt = f"""Esta é a transcrição de uma reunião com os locutores rotulados ({lista}).
+
+Pelo conteúdo (apresentações, saudações, como cada pessoa é chamada), descubra o NOME real de cada locutor.
+
+Responda APENAS com um objeto JSON mapeando cada rótulo ao nome. Exemplo:
+{{"A": "Gilberto", "B": "Vitor"}}
+
+Regras:
+- Se não der para descobrir o nome de um locutor, use o valor "Locutor X" (mantendo a letra).
+- Não invente nomes que não aparecem na conversa.
+
+Transcrição:
+{amostra}"""
+
+    resposta = cliente.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+
+    try:
+        trecho = re.search(r"\{.*\}", resposta.choices[0].message.content, re.DOTALL)
+        mapa = json.loads(trecho.group(0)) if trecho else {}
+    except (ValueError, AttributeError):
+        mapa = {}
+
+    nomes = []
+    texto = transcricao_rotulada
+    for label in labels:
+        nome = str(mapa.get(label) or f"Locutor {label}").strip()
+        texto = texto.replace(f"Locutor {label}:", f"{nome}:")
+        nomes.append(nome)
+
+    participantes = ", ".join(dict.fromkeys(nomes))  # remove duplicados, mantém a ordem
+    return texto, participantes
+
+
 def gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao="Padrão"):
     import time
     print(f"Gerando ata ({tipo_reuniao})...")
@@ -586,13 +634,22 @@ if __name__ == "__main__":
         sys.exit(1)
 
     nome_reuniao = input("Nome da reunião: ")
-    participantes = input("Participantes (separe por vírgula): ")
+    participantes = input("Participantes (Enter para detectar automaticamente): ").strip()
     print("Tipos disponíveis:", ", ".join(PERFIS.keys()))
     tipo_reuniao = input("Tipo de reunião (Enter para Padrão): ").strip() or "Padrão"
 
     try:
-        transcricao = transcrever_audio(caminho_audio)
-        transcricao = corrigir_transcricao(transcricao)
+        import diarizacao
+        if diarizacao.disponivel():
+            transcricao = diarizacao.transcrever_diarizado(caminho_audio)
+            transcricao, detectados = mapear_locutores(transcricao)
+            if not participantes:
+                participantes = detectados or "Não identificado"
+        else:
+            transcricao = transcrever_audio(caminho_audio)
+            transcricao = corrigir_transcricao(transcricao)
+            if not participantes:
+                participantes = extrair_participantes(transcricao) or "Não identificado"
         conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
         documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
         arquivos_salvos = salvar_ata(documento, conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
