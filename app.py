@@ -78,6 +78,8 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
             tmp.write(arquivo_audio.read())
             caminho_tmp = tmp.name
 
+        participantes_auto = not participantes.strip()
+
         try:
             with st.status("Processando reunião...", expanded=True) as status:
                 st.write("⏳ Etapa 1/3 — Extraindo e transcrevendo o áudio via Groq...")
@@ -87,8 +89,8 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                 transcricao = corrigir_transcricao(transcricao)
                 st.write("✅ Revisão concluída!")
 
-                if not participantes.strip():
-                    st.write("🧩 Identificando os participantes...")
+                if participantes_auto:
+                    st.write("🧩 Identificando os participantes pelos nomes citados...")
                     participantes = extrair_participantes(transcricao) or "Não identificado"
                     st.write(f"✅ Participantes: {participantes}")
 
@@ -101,6 +103,13 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                 status.update(label="✅ Ata gerada com sucesso!", state="complete")
 
             st.success("Pronto! Sua ata está abaixo.")
+
+            if participantes_auto:
+                st.info(
+                    f"👥 **Participantes identificados automaticamente:** {participantes}\n\n"
+                    "A lista vem dos nomes citados na reunião, então pode não incluir quem ficou "
+                    "calado. Se faltar alguém, preencha o campo **Participantes** e gere novamente."
+                )
 
             st.markdown("### Ata gerada")
             st.markdown(conteudo_ia)

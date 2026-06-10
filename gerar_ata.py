@@ -441,21 +441,28 @@ Transcrição:
 
 
 def extrair_participantes(transcricao):
-    """Usa o LLM para identificar os nomes dos participantes citados na transcrição."""
+    """Identifica, via IA, os participantes citados na transcrição inteira.
+
+    É best-effort: só capta nomes que foram falados na reunião (o áudio não traz
+    a lista de presença). Consolida variações do mesmo nome.
+    """
     if not transcricao.strip():
         return ""
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    amostra = transcricao[:6000]  # nomes costumam aparecer no início/apresentações
-    prompt = f"""Analise esta transcrição de reunião e liste os nomes próprios das pessoas que participaram (que falaram ou foram tratadas diretamente).
+    texto = transcricao[:120000]  # o modelo comporta a transcrição toda; corte de segurança
+    prompt = f"""Você analisa a transcrição completa de uma reunião corporativa em português.
+
+Identifique TODAS as pessoas que participaram: quem se apresentou, quem falou sendo identificado e quem foi chamado pelo nome como presente na conversa.
 
 Regras:
-- Responda APENAS com os nomes, separados por vírgula, em uma única linha.
-- Não inclua cargos, empresas nem pessoas apenas mencionadas de passagem.
-- Se não houver nomes claros, responda exatamente: Não identificado.
+- Responda APENAS com os nomes próprios, separados por vírgula, em uma única linha.
+- Use a forma mais completa de cada nome (ex.: se aparecem "Gilberto" e "Gilberto Silva", use "Gilberto Silva"). Nunca repita a mesma pessoa.
+- Não inclua cargos, empresas, nem terceiros apenas mencionados que não estavam na reunião.
+- Se não houver nenhum nome claro, responda exatamente: Não identificado.
 
 Transcrição:
-{amostra}"""
+{texto}"""
 
     resposta = cliente.chat.completions.create(
         model="llama-3.3-70b-versatile",
