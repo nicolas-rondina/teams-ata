@@ -1,0 +1,11 @@
+<svg width="360" height="132" viewBox="0 0 360 132" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Nexxa</title>
+  <desc id="desc">Nexxa Food Service Solution</desc>
+  <g transform="translate(2 0)">
+    <path d="M54 11 96 83H12L54 11Z" stroke="#5FE08F" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M54 33 78 74H30L54 33Z" stroke="#5FE08F" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M22 96H86" stroke="#5FE08F" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="130" y="72" fill="#F5FAF7" font-family="Plus Jakarta Sans, Segoe UI, Arial, sans-serif" font-size="46" font-weight="500" letter-spacing="1">Nexxa</text>
+  <text x="132" y="112" fill="#D9E6DF" font-family="Plus Jakarta Sans, Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" letter-spacing=".4">Food Service Solution</text>
+</svg>

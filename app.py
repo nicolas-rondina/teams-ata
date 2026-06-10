@@ -5,7 +5,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS
 from exportar import gerar_docx, gerar_pdf
-from tema import aplicar_tema
+from tema import aplicar_tema, rodape
 
 load_dotenv()
 
@@ -118,3 +118,5 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
 
         finally:
             os.unlink(caminho_tmp)
+
+rodape()
