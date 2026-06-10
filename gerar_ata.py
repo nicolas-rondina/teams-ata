@@ -4,12 +4,37 @@ import re
 import subprocess
 import tempfile
 from datetime import datetime
+import groq
 from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
 
 DURACAO_CHUNK = 1200  # 20 minutos por pedaço
+
+
+def traduzir_erro(exc):
+    """Converte exceções técnicas em mensagens claras para o usuário."""
+    if isinstance(exc, FileNotFoundError):
+        return ("FFmpeg não encontrado. Instale o FFmpeg e garanta que ele está no "
+                "PATH do sistema (https://ffmpeg.org/download.html).")
+    if isinstance(exc, subprocess.CalledProcessError):
+        return ("Não foi possível processar o áudio. Verifique se o arquivo é válido "
+                "e não está corrompido.")
+    if isinstance(exc, groq.AuthenticationError):
+        return ("Chave da Groq inválida ou expirada. Verifique a GROQ_API_KEY no "
+                "arquivo .env (gere uma em https://console.groq.com/keys).")
+    if isinstance(exc, groq.PermissionDeniedError):
+        return "Acesso negado pela Groq. Verifique as permissões da sua chave de API."
+    if isinstance(exc, groq.RateLimitError):
+        return ("Limite de uso da Groq atingido. Aguarde alguns instantes e tente "
+                "novamente.")
+    if isinstance(exc, (groq.APITimeoutError, groq.APIConnectionError)):
+        return ("Não foi possível conectar à Groq. Verifique sua conexão com a "
+                "internet e tente novamente.")
+    if isinstance(exc, groq.APIError):
+        return f"Erro na API da Groq: {exc}"
+    return f"Ocorreu um erro inesperado: {exc}"
 
 PERFIS = {
     "Padrão": {
@@ -530,11 +555,15 @@ if __name__ == "__main__":
     print("Tipos disponíveis:", ", ".join(PERFIS.keys()))
     tipo_reuniao = input("Tipo de reunião (Enter para Padrão): ").strip() or "Padrão"
 
-    transcricao = transcrever_audio(caminho_audio)
-    transcricao = corrigir_transcricao(transcricao)
-    conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
-    documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
-    arquivos_salvos = salvar_ata(documento, conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
+    try:
+        transcricao = transcrever_audio(caminho_audio)
+        transcricao = corrigir_transcricao(transcricao)
+        conteudo_ia = gerar_ata_com_ia(transcricao, nome_reuniao, participantes, tipo_reuniao)
+        documento = montar_documento(conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
+        arquivos_salvos = salvar_ata(documento, conteudo_ia, nome_reuniao, participantes, transcricao, tipo_reuniao)
+    except Exception as exc:
+        print(f"\nErro: {traduzir_erro(exc)}")
+        sys.exit(1)
 
     print(f"\nAta gerada com sucesso!")
     print("Arquivos salvos:")

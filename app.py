@@ -3,7 +3,7 @@ import os
 import tempfile
 from datetime import datetime
 from dotenv import load_dotenv
-from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, PERFIS
+from gerar_ata import transcrever_audio, corrigir_transcricao, gerar_ata_com_ia, montar_documento, traduzir_erro, PERFIS
 from exportar import gerar_docx, gerar_pdf
 
 load_dotenv()
@@ -111,6 +111,9 @@ if st.button("Gerar Ata", type="primary", use_container_width=True):
                     mime="text/plain",
                     use_container_width=True
                 )
+
+        except Exception as exc:
+            st.error(f"❌ {traduzir_erro(exc)}")
 
         finally:
             os.unlink(caminho_tmp)
