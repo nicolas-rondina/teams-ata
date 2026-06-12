@@ -164,12 +164,13 @@ if "ata" in st.session_state:
             f"👥 **Participantes (por separação de voz):** {ata['participantes']}\n\n"
             "A IA separou as vozes e nomeou **só quem se identificou claramente**. ⚠️ **Confira e edite:** "
             "nomes podem precisar de correção; quem aparece como 'Locutor X' não disse o próprio nome; "
-            "e **quem ficou totalmente calado não aparece**. Ajuste o campo **Participantes** e gere novamente se precisar."
+            "e **quem ficou totalmente calado não aparece**. Corrija a lista no campo **Participantes** mais abaixo."
         )
     elif ata["participantes_auto"]:
         st.info(
             f"👥 **Participantes identificados automaticamente:** {ata['participantes']}\n\n"
-            "A lista vem dos nomes citados na reunião, então pode não incluir quem ficou calado."
+            "A lista vem dos nomes citados na reunião, então pode não incluir quem ficou calado. "
+            "Corrija no campo **Participantes** mais abaixo."
         )
 
     st.markdown("### Ata gerada")
@@ -199,6 +200,16 @@ if "ata" in st.session_state:
                     st.error(f"❌ {traduzir_erro(exc)}")
             else:
                 st.warning("Escreva o que você quer ajustar nesse bloco.")
+
+    # Participantes editáveis: corrige a lista sem precisar regerar a ata
+    st.divider()
+    st.markdown("#### Participantes")
+    participantes_editados = st.text_input(
+        "Edite a lista que vai na ata (corrija nomes ou acrescente quem faltou, separado por vírgula)",
+        value=ata["participantes"],
+    )
+    st.session_state["ata"]["participantes"] = participantes_editados
+    ata = st.session_state["ata"]
 
     # Download — sempre reflete a versão mais recente da ata
     st.divider()
