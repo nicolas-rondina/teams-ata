@@ -465,7 +465,7 @@ def extrair_participantes(transcricao):
         return ""
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    texto = transcricao[:45000]  # o modelo comporta a transcrição toda; corte de segurança
+    texto = transcricao[:10000]  # cabe no limite de tokens/minuto do plano free da Groq
     prompt = f"""Você analisa a transcrição completa de uma reunião corporativa em português.
 
 Liste TODAS as pessoas que participaram da reunião, incluindo:
@@ -504,7 +504,7 @@ def mapear_locutores(transcricao_rotulada):
         return transcricao_rotulada, ""
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    amostra = transcricao_rotulada[:30000]
+    amostra = transcricao_rotulada[:10000]
     lista = ", ".join(f"Locutor {l}" for l in labels)
     prompt = f"""Esta é a transcrição de uma reunião com os locutores rotulados ({lista}).
 
@@ -602,6 +602,30 @@ Responda APENAS com a ata completa já corrigida, sem comentários antes ou depo
 
 ATA ATUAL:
 {conteudo_ata}
+
+AJUSTE PEDIDO:
+{instrucao}"""
+
+    resposta = _completar_chat(
+        cliente,
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+    )
+    return resposta.choices[0].message.content
+
+
+def refinar_bloco(bloco, instrucao):
+    """Reescreve APENAS um bloco/seção da ata conforme o pedido do usuário.
+    Envia só o bloco (econômico em tokens)."""
+    cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    prompt = f"""Abaixo está UMA seção de uma ata de reunião (em Markdown) e um pedido de ajuste do usuário.
+
+Reescreva a seção aplicando o pedido, mantendo o mesmo título (linha com ##) e o formato Markdown.
+Não invente fatos que não estavam na seção. Responda APENAS com a seção corrigida, sem comentários antes ou depois.
+
+SEÇÃO ATUAL:
+{bloco}
 
 AJUSTE PEDIDO:
 {instrucao}"""

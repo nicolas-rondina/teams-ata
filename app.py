@@ -6,7 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from gerar_ata import (
     transcrever_audio, corrigir_transcricao, extrair_participantes,
-    mapear_locutores, gerar_ata_com_ia, refinar_ata, montar_documento,
+    mapear_locutores, gerar_ata_com_ia, refinar_bloco, montar_documento,
     traduzir_erro, PERFIS,
 )
 from exportar import gerar_docx, gerar_pdf
@@ -21,6 +21,21 @@ def nome_da_gravacao(nome_arquivo):
     base = re.sub(r"[-_ ]*(meeting recording|grava[çc][ãa]o|recording|v[íi]deo)\b.*$", "", base, flags=re.IGNORECASE)
     base = base.replace("_", " ").strip(" -")
     return base or os.path.splitext(nome_arquivo)[0]
+
+
+def dividir_em_blocos(conteudo):
+    """Divide a ata (Markdown) em blocos por título '## '. Retorna lista de (titulo, texto)."""
+    blocos, titulo, buffer = [], "Início", []
+    for linha in conteudo.split("\n"):
+        if linha.strip().startswith("## "):
+            if buffer:
+                blocos.append((titulo, "\n".join(buffer)))
+            titulo, buffer = linha.strip()[3:].strip(), [linha]
+        else:
+            buffer.append(linha)
+    if buffer:
+        blocos.append((titulo, "\n".join(buffer)))
+    return blocos
 
 load_dotenv()
 
@@ -159,24 +174,30 @@ if "ata" in st.session_state:
     st.markdown("### Ata gerada")
     st.markdown(ata["conteudo"])
 
-    # Ajuste interativo: o usuário pede correções em linguagem natural
-    with st.expander("✏️ Não ficou bom? Peça um ajuste para a IA", expanded=False):
+    # Ajuste interativo por bloco: o usuário escolhe a seção e pede a correção
+    with st.expander("✏️ Não gostou de um bloco? Peça à IA para ajustar", expanded=False):
+        blocos = dividir_em_blocos(ata["conteudo"])
+        titulos = [t for t, _ in blocos]
+        bloco_escolhido = st.selectbox("Qual bloco você quer ajustar?", titulos, key="bloco_escolhido")
         instrucao = st.text_area(
-            "O que você quer corrigir ou melhorar na ata?",
-            placeholder="Ex.: detalhe melhor as decisões; remova a seção Riscos; "
-                        "corrija 'Joao' para 'João'; deixe o tom mais formal",
-            key="instrucao_ajuste",
+            "O que mudar nesse bloco?",
+            placeholder="Ex.: detalhe melhor; resuma em tópicos; corrija 'Joao' para 'João'; "
+                        "deixe o tom mais formal; remova o que não foi decidido",
+            key="instrucao_bloco",
         )
-        if st.button("Corrigir ata", use_container_width=True):
+        if st.button("Corrigir este bloco", use_container_width=True):
             if instrucao.strip():
                 try:
-                    with st.spinner("Aplicando o ajuste..."):
-                        st.session_state["ata"]["conteudo"] = refinar_ata(ata["conteudo"], instrucao)
+                    with st.spinner(f"Ajustando o bloco '{bloco_escolhido}'..."):
+                        idx = titulos.index(bloco_escolhido)
+                        titulo, texto_bloco = blocos[idx]
+                        blocos[idx] = (titulo, refinar_bloco(texto_bloco, instrucao))
+                        st.session_state["ata"]["conteudo"] = "\n".join(t for _, t in blocos)
                     st.rerun()
                 except Exception as exc:
                     st.error(f"❌ {traduzir_erro(exc)}")
             else:
-                st.warning("Escreva o que você quer ajustar.")
+                st.warning("Escreva o que você quer ajustar nesse bloco.")
 
     # Download — sempre reflete a versão mais recente da ata
     st.divider()
