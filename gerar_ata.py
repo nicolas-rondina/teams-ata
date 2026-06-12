@@ -466,16 +466,14 @@ def extrair_participantes(transcricao):
 
     cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
     texto = transcricao[:10000]  # cabe no limite de tokens/minuto do plano free da Groq
-    prompt = f"""Você analisa a transcrição completa de uma reunião corporativa em português.
+    prompt = f"""Você analisa a transcrição de uma reunião corporativa em português.
 
-Liste TODAS as pessoas que participaram da reunião, incluindo:
-- quem falou (mesmo poucas vezes);
-- quem foi cumprimentado, chamado ou tratado diretamente (ex.: "bom dia, Ana", "passa pro João", "o que você acha, Pedro?"), MESMO que tenha falado pouco ou nada;
-- quem foi citado claramente como presente na reunião.
+Liste APENAS as pessoas que claramente PARTICIPARAM da reunião (falaram, se apresentaram ou foram tratadas diretamente como presentes).
 
 NÃO inclua:
-- pessoas apenas mencionadas que NÃO estavam na reunião (terceiros, clientes ausentes, fornecedores citados);
+- pessoas apenas citadas/mencionadas na conversa que não estavam participando (terceiros, clientes ausentes, fornecedores, colegas citados);
 - cargos ou nomes de empresas.
+Na dúvida se a pessoa estava realmente presente, NÃO a inclua. É melhor faltar um nome do que incluir alguém que não estava.
 
 Regras de saída:
 - Responda APENAS com os nomes próprios, separados por vírgula, em uma única linha.
@@ -508,14 +506,17 @@ def mapear_locutores(transcricao_rotulada):
     lista = ", ".join(f"Locutor {l}" for l in labels)
     prompt = f"""Esta é a transcrição de uma reunião com os locutores rotulados ({lista}).
 
-Pelo conteúdo (apresentações, saudações, como cada pessoa é chamada), descubra o NOME real de cada locutor.
+Descubra o nome real de cada locutor APENAS quando houver evidência clara:
+- a própria pessoa se identifica (ex.: "aqui é o Gilberto", "meu nome é Ana"); ou
+- ela é chamada diretamente pelo nome e é claramente quem está respondendo.
 
-Responda APENAS com um objeto JSON mapeando cada rótulo ao nome. Exemplo:
-{{"A": "Gilberto", "B": "Vitor"}}
+REGRAS IMPORTANTES:
+- Se NÃO houver evidência clara do nome de um locutor, mantenha "Locutor X" (com a letra). É melhor deixar "Locutor X" do que arriscar um nome errado.
+- NUNCA atribua um nome por suposição.
+- NÃO use nomes de pessoas que são apenas citadas/mencionadas na conversa e não são o próprio locutor.
 
-Regras:
-- Se não der para descobrir o nome de um locutor, use o valor "Locutor X" (mantendo a letra).
-- Não invente nomes que não aparecem na conversa.
+Responda APENAS com um objeto JSON mapeando cada rótulo ao nome (ou a "Locutor X"). Exemplo:
+{{"A": "Gilberto", "B": "Locutor B"}}
 
 Transcrição:
 {amostra}"""

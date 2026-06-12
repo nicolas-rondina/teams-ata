@@ -161,9 +161,10 @@ if "ata" in st.session_state:
 
     if ata["participantes_auto"] and ata["usar_diarizacao"]:
         st.info(
-            f"👥 **Participantes identificados (separação de voz):** {ata['participantes']}\n\n"
-            "A IA separou as vozes e deduziu os nomes pelo diálogo. Se algum aparecer como "
-            "'Locutor X', o nome dele não foi dito na reunião."
+            f"👥 **Participantes (por separação de voz):** {ata['participantes']}\n\n"
+            "A IA separou as vozes e nomeou **só quem se identificou claramente**. ⚠️ **Confira e edite:** "
+            "nomes podem precisar de correção; quem aparece como 'Locutor X' não disse o próprio nome; "
+            "e **quem ficou totalmente calado não aparece**. Ajuste o campo **Participantes** e gere novamente se precisar."
         )
     elif ata["participantes_auto"]:
         st.info(
